@@ -1,21 +1,3 @@
-
-  // public void open(Socket socket) throws Exception {
-  //   this.send("220",socket);
-  //   String fromClient = this.receive(socket);
-  //   if (fromClient.equals("admin")) {
-  //     this.send("331",socket);
-  //     fromClient = this.receive(socket);
-  //     if (fromClient.equals("password")) {
-  //       this.send("230",socket);
-  //     }
-  //     else {
-  //       this.send("530",socket);
-  //     }
-  //   }
-  //   else {
-  //     this.send("530",socket);
-  //   }
-  // }
 import java.io.*;
 import java.net.*;
 
@@ -35,25 +17,94 @@ class TCP_Server{
   public TCP_Server () throws Exception 
   {
     serverSocket = new ServerSocket(2121);
+    clientSocket = serverSocket.accept();
     dir = ".";
   }
 
 
+  public void open() throws Exception {
+    send("220\n");
+    String fromClient = receive();
+    if (fromClient.equals("admin")) {
+      send("331\n");
+      fromClient = receive();
+      if (fromClient.equals("password")) {
+        send("230\n");
+      } 
+      else {
+        send("530\n");
+      }
+    }
+    else {
+      send("530\n");
+    }
+  }
+  
+  public void cd(String dir) throws Exception {
+    if (dir.startsWith("/")) 
+    {
+      File f = new File(dir);
+      if (f.exists() && f.isDirectory()) 
+      {
+        this.dir = dir;
+        send("250\n");
+        return;
+      }
+      send("550\n");
+    }
+    else {
+      File f = new File(this.dir + "/" + dir);
+      if (f.exists() && f.isDirectory()) {
+        if (this.dir.equals(".")) {
+          this.dir = "";
+        }
+        this.dir = this.dir + dir;
+        send("250\n");
+        return;
+      }
+      send("550\n");
+    }
+  }
 
+  public void ls() throws Exception {
+    System.out.println("TCP ls");
+    String list = " ";
+    String final2 ="";
+    File dir = new File(this.dir);
+    for (String d : dir.list()) 
+    {
+      File f = new File(this.dir+"/"+d);
+      if (f.isFile()) {
+        d = "file   " + d + "&&&";
+      }
+      else {
+        d = "dir    " + d +"&&&";
+      } 
+      final2 =final2 + d;
+    }
 
- 
-  public void send(String s,Socket socket) throws Exception {
+    send(final2+"\n");
+  }
 
-    DataOutputStream outToClient = new DataOutputStream(socket.getOutputStream());
+  
+  public void quit() throws Exception {
+    System.out.println("TCP Terminando sesión.");
+    clientSocket.close();
+    serverSocket.close();
+  }
+
+  public void send(String s) throws Exception {
+
+    DataOutputStream outToClient = new DataOutputStream(clientSocket.getOutputStream());
     outToClient.writeBytes(s); 
     outToClient.flush();  
 
   }
 
-  public String receive(Socket socket) throws Exception 
+  public String receive() throws Exception 
   { 
     String fromClient;  
-    BufferedReader inFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
+    BufferedReader inFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
     fromClient = inFromClient.readLine();
     return fromClient.trim();
   }
@@ -61,7 +112,6 @@ class TCP_Server{
   public static void main(String args[])throws Exception 
   { 
     TCP_Server server = new TCP_Server();
-    Socket clientSocket = server.serverSocket.accept ();
     String capitalizedSentence;
     String fromClient;
     String output[];
@@ -70,20 +120,29 @@ class TCP_Server{
       // BufferedReader inFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
       // DataOutputStream outToClient = new DataOutputStream(clientSocket.getOutputStream());
       // fromClient = inFromClient.readLine();
-      fromClient = server.receive(clientSocket);
+      fromClient = server.receive();
       output = fromClient.split(" ");
-      System.out.println("FROM CLIENT: " + fromClient);
+      // System.out.println("FROM CLIENT: " + fromClient);
 
       if(output[0].equals("open"))
-      {
-        System.out.println("FROM CLIENT: " + fromClient);
-        server.send("220\n",clientSocket);  
+      { 
+        System.out.println("> Cient : " + fromClient);
+        server.open();
+      }
+      else if(output[0].equals("cd"))
+      { 
+        System.out.println("> Cient : " + fromClient);
+        server.cd(output[1]);
+      }
+      else if(output[0].equals("ls"))
+      { 
+        System.out.println("> Cient : " + fromClient);
+        server.ls();
       }
       else if(output[0].equals("quit"))
       { 
-        server.send("quit",clientSocket);
-        clientSocket.close ();
-        server.serverSocket.close ();
+        server.send("quit");
+        server.quit();
         break;
       }
       // System.out.println("Received: " + fromClient);
