@@ -1,3 +1,34 @@
+
+  // public void open(String ip, Socket socket) throws Exception
+  // {
+
+  //   System.out.println("TCP Connected to "+ ip +"...");
+  //   serverAdd = InetAddress.getByName(ip);
+  //   ipServer = ip;
+  //   this.send("open",socket);
+  //   String fromServer = receive(clientSocket);
+
+  //   if (fromServer.equals("220")) {
+  //     String input =  System.console().readLine("Ingrese Usuario > ");
+  //     this.send(input,socket);
+  //     fromServer = receive(clientSocket);
+  //     if (fromServer.equals("331")) {
+  //       input =  System.console().readLine("Ingrese Password > ");
+  //       this.send(input,socket);
+  //       fromServer = receive(clientSocket);
+  //       if (fromServer.equals("230")) {
+  //         System.out.println("Login OK");
+  //         conected = true;
+  //       }
+  //       else {
+  //         System.out.println("Login Error");    
+  //       }
+  //     }
+  //     else {
+  //       System.out.println("Login Error");    
+  //     }
+  //   }
+  // }
 import java.io.*;
 import java.net.*;
 import java.util.*;
@@ -22,13 +53,14 @@ class TCP_Client
   { 
     DataOutputStream outToServer = new DataOutputStream(socket.getOutputStream());
     outToServer.writeBytes(s);
+    outToServer.flush();
   }
 
   public String receive(Socket socket) throws Exception 
   {   
       BufferedReader inFromServer = new BufferedReader(new InputStreamReader (socket.getInputStream()));
       String res = inFromServer.readLine(); // if connection closes on server end, this throws java.net.SocketException 
-      return res;
+      return res.trim();
   }
   
    public static void main(String args[])throws Exception 
@@ -51,9 +83,11 @@ class TCP_Client
       // outToServer.writeBytes(input + '\n');
       fromServer = client.receive(clientSocket);
       System.out.println("FROM SERVER: " + fromServer);
-      if(params[0].equals("open"))
-      {  
-          System.out.println(params[1]);
+      
+      if(fromServer.equals("220"))//no pesca la comparacion
+      {
+          input =  System.console().readLine("Ingrese Usuario > ");
+          client.send(input,clientSocket);
       }
       else if(fromServer.equals("quit"))
       {
@@ -84,4 +118,5 @@ class TCP_Client
   }
 
 }
+
 

@@ -1,3 +1,21 @@
+
+  // public void open(Socket socket) throws Exception {
+  //   this.send("220",socket);
+  //   String fromClient = this.receive(socket);
+  //   if (fromClient.equals("admin")) {
+  //     this.send("331",socket);
+  //     fromClient = this.receive(socket);
+  //     if (fromClient.equals("password")) {
+  //       this.send("230",socket);
+  //     }
+  //     else {
+  //       this.send("530",socket);
+  //     }
+  //   }
+  //   else {
+  //     this.send("530",socket);
+  //   }
+  // }
 import java.io.*;
 import java.net.*;
 
@@ -27,7 +45,8 @@ class TCP_Server{
   public void send(String s,Socket socket) throws Exception {
 
     DataOutputStream outToClient = new DataOutputStream(socket.getOutputStream());
-    outToClient.writeBytes(s);   
+    outToClient.writeBytes(s); 
+    outToClient.flush();  
 
   }
 
@@ -36,7 +55,7 @@ class TCP_Server{
     String fromClient;  
     BufferedReader inFromClient = new BufferedReader(new InputStreamReader(socket.getInputStream()));
     fromClient = inFromClient.readLine();
-    return fromClient;
+    return fromClient.trim();
   }
 
   public static void main(String args[])throws Exception 
@@ -53,9 +72,12 @@ class TCP_Server{
       // fromClient = inFromClient.readLine();
       fromClient = server.receive(clientSocket);
       output = fromClient.split(" ");
+      System.out.println("FROM CLIENT: " + fromClient);
+
       if(output[0].equals("open"))
       {
-        server.send("open\n",clientSocket);  
+        System.out.println("FROM CLIENT: " + fromClient);
+        server.send("220\n",clientSocket);  
       }
       else if(output[0].equals("quit"))
       { 
