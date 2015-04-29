@@ -2,7 +2,7 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 
-class UDPClient implements Client
+class UDPClient 
 {
   Boolean conected;
   String serverIp;

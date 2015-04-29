@@ -28,10 +28,12 @@ class TCP_Server{
   public void open() throws Exception {
     send("220\n");
     String fromClient = receive();
-    if (fromClient.equals("admin")) {
+    String output[] = fromClient.split(" ");
+    if (output[1].equals("admin")) {
       send("331\n");
       fromClient = receive();
-      if (fromClient.equals("password")) {
+      output = fromClient.split(" ");
+      if (output[1].equals("password")) {
         send("230\n");
       } 
       else {
@@ -126,25 +128,75 @@ class TCP_Server{
     send(empty);
   }
 
-  private void saveFile(String fileName) throws Exception {  
-    
-    InputStream is = null;
-    FileOutputStream fos = null;
-    try {
-        byte[] mybytearray = new byte[1024];
-        is = clientSocket.getInputStream();
-        fos = new FileOutputStream("hola/"+fileName);
+  private void put(String fileName) throws Exception {  
 
-        int count;
-        while ((count = is.read(mybytearray)) >= 0) {
-            fos.write(mybytearray, 0, count);
-        }
-    } finally {
-            fos.close();
-    }
+    DataInputStream transferIn = null;
+          File file = null;
+          DataOutputStream fileOut = null;
+          try{
+            transferIn = new DataInputStream(clientSocket.getInputStream());
+            file = new File(fileName);
+            fileOut = new DataOutputStream(new FileOutputStream("hola/"+file));
+          }
+          catch(Exception e){
+          }
+          try{
+            byte b = 0;
+            while((b = transferIn.readByte()) != -1)
+            {
+              fileOut.write(b);
+            }
+            transferIn.close();
+            fileOut.close();
+          }
+          catch(Exception e){
+          } 
+    // InputStream is = null;
+    // FileOutputStream fos = null;
+    // try {
+    //     byte[] mybytearray = new byte[1024];
+    //     is = clientSocket.getInputStream();
+    //     fos = new FileOutputStream("hola/"+fileName);
+
+    //     int count;
+    //     while ((count = is.read(mybytearray)) >= 0) {
+    //         fos.write(mybytearray, 0, count);
+    //     }
+    // } finally {
+    //         fos.close();
+    // }
 
   
   } 
+
+  private void get(String fileName) throws Exception{
+
+    DataOutputStream transferOut = null;
+    File file = null;
+    DataInputStream fileIn = null;
+    try{
+      file = new File(dirAux+"/"+fileName);
+      fileIn = new DataInputStream(new FileInputStream(file));
+    }
+    catch(IOException e){
+      
+    }
+    try{
+      transferOut = new DataOutputStream(clientSocket.getOutputStream());
+      byte b = 0;
+      while((b = fileIn.readByte()) != -1)
+      {
+        transferOut.write(b);
+      }
+
+      fileIn.close();
+      transferOut.close();
+    }
+     catch(IOException e){
+      
+    }
+    
+  }
 
 
     
@@ -193,23 +245,29 @@ class TCP_Server{
         System.out.println("> Client : " + fromClient);
         server.open();
       }
-      else if(output[0].equals("cd"))
+      else if(output[0].equals("CWD"))
       { 
         System.out.println("> Client : " + fromClient);
         server.cd(output[1]);
       }
-      else if(output[0].equals("ls"))
+      else if(output[0].equals("LIST"))
       { 
         System.out.println("> Client : " + fromClient);
         server.ls();
       }
-      else if(output[0].equals("put"))
+      else if(output[0].equals("STOR"))
       { 
         System.out.println("> Client : " + fromClient);
-        server.saveFile(output[1]);
+        server.put(output[1]);
 
       }
-      else if(output[0].equals("quit"))
+      else if(output[0].equals("RETR"))
+      { 
+        System.out.println("> Client : " + fromClient);
+        server.get(output[1]);
+
+      }
+      else if(output[0].equals("QUIT"))
       { 
         System.out.println("> Client : " + fromClient);
         server.quit();

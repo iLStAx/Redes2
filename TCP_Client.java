@@ -33,12 +33,12 @@ class TCP_Client
     char pass[];
     if (fromServer.equals("220")) {
       String input =  System.console().readLine("> User : ");
-      send(input+"\n");        
+      send("USER "+input+"\n");        
 
       fromServer = receive();
       if (fromServer.equals("331")) {
         pass =  System.console().readPassword("> Password : ");
-        send(String.valueOf(pass)+"\n");
+        send("PASS "+String.valueOf(pass)+"\n");
         fromServer = receive();
         if (fromServer.equals("230")) {
           System.out.println("230 Login OK");
@@ -56,7 +56,7 @@ class TCP_Client
 
   public void cd(String dir) throws Exception {
 
-    send("cd "+dir+"\n");
+    send("CWD "+dir+"\n");
     String ans = receive();
     if (ans.split(" ")[0].equals("250")) {
       currentDir = ans.split(" ")[1];
@@ -69,7 +69,7 @@ class TCP_Client
   }
   public void ls() throws Exception {
 
-    send("ls\n");
+    send("LIST\n");
     String ans = receive();    
     System.out.println("150 Show List From " + ans);
     ans = receive();
@@ -81,12 +81,69 @@ class TCP_Client
 
   public void quit() throws Exception {
       System.out.println("TCP Connection Close.");
-      send("quit\n");
+      send("QUIT\n");
       String res = receive();
       if(res.equals("quit"))
         clientSocket.close(); 
   }
 
+
+  public void get(String fname) throws Exception{
+    
+        send("RETR "+fname+"\n");
+        
+          DataInputStream transferIn = null;
+          File file = null;
+          DataOutputStream fileOut = null;
+          try{
+            transferIn = new DataInputStream(clientSocket.getInputStream());
+            file = new File(fname);
+            fileOut = new DataOutputStream(new FileOutputStream(file));
+          }
+          catch(Exception e){
+          }
+          try{
+            byte b = 0;
+            while((b = transferIn.readByte()) != -1)
+            {
+              fileOut.write(b);
+            }
+            transferIn.close();
+            fileOut.close();
+          }
+          catch(Exception e){
+          } 
+
+  }
+
+  public void put(String fileName) throws Exception
+  { 
+    send("STOR "+fileName+"\n"); 
+    DataOutputStream transferOut = null;
+    File file = null;
+    DataInputStream fileIn = null;
+    try{
+      file = new File(currentDir+"/"+fileName);
+      fileIn = new DataInputStream(new FileInputStream(file));
+    }
+    catch(IOException e){
+      
+    }
+    try{
+      transferOut = new DataOutputStream(clientSocket.getOutputStream());
+      byte b = 0;
+      while((b = fileIn.readByte()) != -1)
+      {
+        transferOut.write(b);
+      }
+
+      fileIn.close();
+      transferOut.close();
+    }
+     catch(IOException e){
+      
+    }
+  }
 
   public void send(String s) throws Exception 
   { 
@@ -102,33 +159,32 @@ class TCP_Client
       return res.trim();
   }
     
-  public void sendFile(String fileName) throws Exception
-  { 
-    send("put "+fileName+"\n"); 
-    File myFile = new File(currentDir+"/"+fileName);
-    FileInputStream fis = null;
-    OutputStream os = null;
-    while (true) 
-    {
-        try {
-        byte[] mybytearray = new byte[1024];
-        fis = new FileInputStream(myFile);
-        os = clientSocket.getOutputStream();
+  
+    // File myFile = new File(currentDir+"/"+fileName);
+    // FileInputStream fis = null;
+    // OutputStream os = null;
+    // while (true) 
+    // {
+    //     try {
+    //     byte[] mybytearray = new byte[1024];
+    //     fis = new FileInputStream(myFile);
+    //     os = clientSocket.getOutputStream();
 
-        int count;
-        while ((count = fis.read(mybytearray)) >= 0) {
-            os.write(mybytearray, 0, count);
+    //     int count;
+    //     while ((count = fis.read(mybytearray)) >= 0) {
+    //         os.write(mybytearray, 0, count);
 
-        }
-        System.out.println("Sending " + fileName + "(" + Integer.toString((int)myFile.length()) + " bytes)");
-        os.flush();
-        break;
-        } finally{
-          fis.close();
-        }
+    //     }
+    //     System.out.println("Sending " + fileName + "(" + Integer.toString((int)myFile.length()) + " bytes)");
+    //     os.flush();
+    //     break;
+    //     } finally{
+    //       fis.close();
+    //     }
 
-    }
-  }
+    // }
+
+
 
 
   public static void main(String args[])throws Exception 
@@ -160,8 +216,13 @@ class TCP_Client
       } 
       else if(params[0].equals("put"))
       { 
-        client.sendFile(params[1]);
+        client.put(params[1]);
           continue;
+      }
+      else if(params[0].equals("get"))
+      { 
+        client.get(params[1]);
+        continue;
       }
       else if(params[0].equals("quit"))
       { 

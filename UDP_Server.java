@@ -1,7 +1,7 @@
 import java.io.*;
 import java.net.*;
 
-class UDPServer implements Server {
+class UDPServer{
 
   Boolean conected;
   String clientIp;
