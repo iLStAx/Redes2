@@ -2,38 +2,38 @@ import java.io.*;
 import java.net.*;
 import java.util.*;
 
-class UDP_Client
+class UDPClient implements Client
 {
   Boolean conected;
-  String ipServer;
+  String serverIp;
   InetAddress serverAdd;
   DatagramSocket clientSocket;
   int controlP;
   int dataP;
 
-  public UDP_Client(int control, int data) {
+  public UDPClient(int control, int data) {
     conected = false;
     controlP = control;
     dataP = data;
   }
 
-  public void open(String ip) throws Exception
-  {
-
-    System.out.println("UDP Connected to "+ ip +"...");
+  public void open(String ip) throws Exception {
+    System.out.println("UDP Conectando con "+ ip +"...");
     serverAdd = InetAddress.getByName(ip);
-    ipServer = ip;
+    serverIp = ip;
     clientSocket = new DatagramSocket();
+
     send("open");
     String answer = receive();
-
-    if (answer.equals("220")) {
+    
+    char pass[];
+    if (answer.equals("220")){
       String input =  System.console().readLine("Ingrese Usuario > ");
       send(input);
       answer = receive();
       if (answer.equals("331")) {
-        input =  System.console().readLine("Ingrese Password > ");
-        send(input);
+        pass =  System.console().readPassword("Ingrese Password > ");
+        send(new String(pass));
         answer = receive();
         if (answer.equals("230")) {
           System.out.println("Login OK");
@@ -44,6 +44,7 @@ class UDP_Client
         }
       }
       else {
+        System.out.println(answer);    
         System.out.println("Login Error");    
       }
     }
@@ -53,8 +54,7 @@ class UDP_Client
       help(1);
       return;
     }
-    send("cd");
-    send(dir);
+    send("cd "+dir);
     String ans = receive();
     if (ans.equals("250")) {
       System.out.println(dir + " es el nuevo directorio de trabajo.");
@@ -71,50 +71,29 @@ class UDP_Client
     }
     send("ls");
     String ans = receive();
-    while (!ans.equals("226")) {
-      System.out.println(ans);
-      ans = receive();
-    }
+    System.out.println(ans);
+    ans = receive();
+    System.out.println(ans);
   }
   public void get(String fname) throws Exception {
-    System.out.println("UDP get "+ fname +"...");
     if (!conected) {
       help(1);
       return;
     }
-    send("get");
-    send(fname);
-    String ans = receive();
-    if (ans.equals("150")) {
-      receiveFile(fname);
+    send("get "+fname);
+    String ans[] = receive().split(" ");
+    if (ans[0].equals("150")) {
+      int size = Integer.parseInt( ans[2].replace("(","").replace(")","") );
+      receiveFile(fname, size);
     }
   }
   public void put(String fname) throws Exception {
     System.out.println("UDP put "+ fname +"...");
-    send("put");
-    // if (!conected) {
-    //   help(1);
-    //   return;
-    // }
-    // send("put");
-    // String ans = receive();
-    // if (ans.equals("150")) {
-
-    // }
-    // fname.startsWith("./");
-    // byte b[]=new byte[1024];
-    // FileInputStream f=new FileInputStream(fname);
-    // DatagramSocket dsoc=new DatagramSocket(2121);
-    // int i=0;
-    // while(f.available()!=0)
-    // {
-    //             b[i]=(byte)f.read();
-    //             i++;
-    // }                     
-    // f.close();
-    // DatagramPacket data = new DatagramPacket(b,i,UDP_ClinipServer,2020);
-    // dsoc.send(data);
-   
+    if (!conected) {
+      help(1);
+      return;
+    }
+    sendFile(fname);
   }
 
   public void quit() throws Exception {
@@ -124,139 +103,113 @@ class UDP_Client
 
   public void help(int n) {
     if (n == 0) {
-      System.out.println("UDP_Client Options:");
-      System.out.println("    - open  <ip address>");
-      System.out.println("          Open connection with <ip address>.\n");
-      System.out.println("    - cd <dir>");
-      System.out.println("          Change dir.\n");
+      System.out.println("Manual UDPClient:");
+      System.out.println("  Opciones:");
+      System.out.println("    - open  <dirección ip>");
+      System.out.println("          Abre una conexión con <dirección ip>.\n");
+      System.out.println("    - cd <directorio>");
+      System.out.println("          Cambio directorio.\n");
       System.out.println("    - ls");
-      System.out.println("          Files to current dir.\n");
-      System.out.println("    - get  <file>");
-      System.out.println("          Pull <file> from server.\n");
-      System.out.println("    - put  <file>");
-      System.out.println("          Upload <file> to server.\n");
+      System.out.println("          Contenido del directorio actual.\n");
+      System.out.println("    - get  <archivo>");
+      System.out.println("          Extrae <archivo> del servidor.\n");
+      System.out.println("    - put  <archivo>");
+      System.out.println("          Sube <archivo> al servidor.\n");
       System.out.println("    - quit");
-      System.out.println("          Close session.\n");
+      System.out.println("          Termina la sesión.\n");
     }
     else if (n == 1) {
       System.out.println("Error 1:");
-      System.out.println("First need to open connection.");
+      System.out.println("  Debe abrir una conexión primero.");
     }
   }
 
-  public void send(String s)  throws Exception 
-  { 
+  public void send(String s)  throws Exception {
     byte[] sendData = new byte[1024];
     sendData = s.getBytes();
+    Thread.sleep(100);
     DatagramPacket sendPacket = new DatagramPacket(sendData, sendData.length, serverAdd, controlP);
     clientSocket.send(sendPacket);
   }
 
-  public String receive()  throws Exception 
-  {
+  public String receive()  throws Exception {
     byte[] receiveData = new byte[1024];
     DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-    clientSocket.receive(receivePacket);
-    String answer = new String(receivePacket.getData());
+    clientSocket.setSoTimeout(2000);
+    String answer;
+    try {
+      clientSocket.receive(receivePacket);
+      answer = new String(receivePacket.getData());
+    }
+    catch (SocketTimeoutException e) {
+      // timeout exception.
+      System.out.println("Tiempo de espera agotado!");
+      answer = "425";
+    }
+    clientSocket.setSoTimeout(0);
     return answer.trim();
   }
 
-  public void receiveFile(String file) throws Exception 
-  {
-    file = "rec" + file;
-    int b = Integer.parseInt(receive());
-    byte[] receiveData = new byte[b];
-    DatagramPacket receivePacket = new DatagramPacket(receiveData, receiveData.length);
-    clientSocket.receive(receivePacket);
-
-    if (!new File(file).exists()) 
-    {
-        new File(file).mkdirs();
+  public void sendFile(String fname) throws Exception {
+    byte b[] = new byte[1024];
+    FileInputStream f = new FileInputStream(fname);
+    int size = (int) f.getChannel().size();
+    send("put "+fname+" ("+String.valueOf(size)+")");
+    // DatagramSocket dsoc = new DatagramSocket(dataP);
+    
+    Thread.sleep(100);
+    int bytes = 0;
+    while(f.available()!=0) {
+      f.read(b);
+      clientSocket.send(new DatagramPacket( b, 1024, serverAdd, dataP ));
+      bytes += 1024;
+      if (bytes > size) {
+        bytes = size;
+      }
+      System.out.print("\r     " + bytes + "/" + size + " bytes     "); 
+      Thread.sleep(1);
     }
-    File dstFile = new File(file);
-
-    FileOutputStream fileOutputStream = null;
-    try 
-    {
-        fileOutputStream = new FileOutputStream(dstFile);
-        fileOutputStream.write(receiveData);
-        fileOutputStream.flush();
-        fileOutputStream.close();
-        System.out.println("Output file : " + file + " is successfully saved ");
-    }
-    catch (FileNotFoundException e) 
-    {
-      e.printStackTrace();
-    } 
-    catch (IOException e) 
-    {
-        e.printStackTrace();
-    }
+                         
+    System.out.println(); 
+    f.close();
+    //clientSocket.close();
   }
 
-   public static void main(String args[])throws Exception 
-  {
-    int controlP = 21;
-    int dataP = 20;
+  public void receiveFile(String file, int size) throws Exception {
+    byte b[] = new byte[2048];
+    DatagramPacket dp = new DatagramPacket( b, b.length );
 
-    UDP_Client client;
-    client = new UDP_Client(controlP,dataP);
-    while (true) 
-    {
-      String input =  System.console().readLine("> ");
-      String params[] = input.split(" ");
-      if (params[0].equals("open"))
-      {
-        if (params.length == 1) 
-        {
-          client.help(0);
-          continue;
+    FileOutputStream f = new FileOutputStream("received/"+file);
+    int bytesReceived = 0;
+    System.out.print("Receiving file...");
+    Boolean ok = true;
+    while(bytesReceived < size) {
+      clientSocket.setSoTimeout(2000);
+      try {
+        clientSocket.receive(dp);
+        bytesReceived = bytesReceived + dp.getLength();
+        int bytes = dp.getLength();
+        if (bytesReceived - size > 0) {
+          bytes -= bytesReceived - size;
+          bytesReceived = size;
         }
-        client.open(params[1]);
+
+        System.out.print("\r     " + bytesReceived + "/" + size + " bytes     "); 
+        f.write(dp.getData(), 0,  bytes);
       }
-      else if (params[0].equals("cd")) 
-      {
-        if (params.length == 1) 
-        {
-          client.help(0);
-          continue;
-        }
-        client.cd(params[1]);
-      }
-      else if (params[0].equals("ls")) 
-      {
-        client.ls();
-        continue;
-      } 
-      else if (params[0].equals("get")) 
-      {
-        if (params.length == 1) 
-        {
-          client.help(0);
-          continue;
-        }
-        client.get(params[1]);
-      } 
-      else if (params[0].equals("put")) 
-      {
-        if (params.length == 1) 
-        {
-          client.help(0);
-          continue;
-        }
-        client.put(params[1]);
-      }
-      else if (params[0].equals("quit")) 
-      {
-        client.quit();
+      catch (SocketTimeoutException e) {
+        // timeout exception.
+        System.out.println("\nTiempo de espera agotado! Archivo corrompido");
+        ok = false;
         break;
-      } 
-      else 
-      {
-        client.help(0);
       }
+      clientSocket.setSoTimeout(0);
     }
+    if (ok) {
+      System.out.println("\n226 Transferencia Completada"); 
+    }
+
+    f.close();
   }
 
 }
-

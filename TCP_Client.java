@@ -1,7 +1,7 @@
-
 import java.io.*;
 import java.net.*;
 import java.util.*;
+
 
 class TCP_Client
 {
@@ -9,13 +9,17 @@ class TCP_Client
   String ipServer;
   InetAddress serverAdd;
   Socket clientSocket;
-  int controlPort;
+  int serverPort;
   int dataPort;
+  int buffer_size;
+  String currentDir;
 
   public TCP_Client(int control, int data) {
-    controlPort = control;
+    serverPort = control;
     dataPort = data;
+    currentDir = ".";
   }
+
 
 
   public void open(String ip,int port) throws Exception
@@ -28,16 +32,16 @@ class TCP_Client
     String fromServer = receive();
     char pass[];
     if (fromServer.equals("220")) {
-      String input =  System.console().readLine("> Ingrese Usuario : ");
+      String input =  System.console().readLine("> User : ");
       send(input+"\n");        
 
       fromServer = receive();
       if (fromServer.equals("331")) {
-        pass =  System.console().readPassword("> Ingrese Password : ");
+        pass =  System.console().readPassword("> Password : ");
         send(String.valueOf(pass)+"\n");
         fromServer = receive();
         if (fromServer.equals("230")) {
-          System.out.println("Login OK");
+          System.out.println("230 Login OK");
           conected = true;
         }
         else {
@@ -51,38 +55,38 @@ class TCP_Client
   }
 
   public void cd(String dir) throws Exception {
-    if (!conected) {
-      // help(1);
-      return;
-    }
+
     send("cd "+dir+"\n");
     String ans = receive();
-    if (ans.equals("250")) {
-      System.out.println(dir + " es el nuevo directorio de trabajo.");
+    if (ans.split(" ")[0].equals("250")) {
+      currentDir = ans.split(" ")[1];
+      System.out.println("250 "+ ans.split(" ")[1] + " is the new work directory.");
     }
     else {
-      System.out.println(dir + " no encontrado.");
+      System.out.println(dir + " not found.");
     }
 
   }
   public void ls() throws Exception {
-    if (!conected) {
-      // help(1);
-      System.out.println("en ls no conectado");
-      return;
-    }
+
     send("ls\n");
-    String ans = receive();
-    ans = ans.replace("&&&","\n");
+    String ans = receive();    
+    System.out.println("150 Show List From " + ans);
+    ans = receive();
+    ans = ans.replace("saltodelinea","\n");
     ans = ans.substring(0,ans.length()-1);
-    System.out.println(ans+"\b\b\b");
-    
+    System.out.println(ans+"\b\b\b"); 
+    System.out.println("226 List Complete"); 
   }
 
   public void quit() throws Exception {
-    System.out.println("TCP Close Connection.");
-    clientSocket.close();
+      System.out.println("TCP Connection Close.");
+      send("quit\n");
+      String res = receive();
+      if(res.equals("quit"))
+        clientSocket.close(); 
   }
+
 
   public void send(String s) throws Exception 
   { 
@@ -97,13 +101,41 @@ class TCP_Client
       String res = inFromServer.readLine(); // if connection closes on server end, this throws java.net.SocketException 
       return res.trim();
   }
-  
-   public static void main(String args[])throws Exception 
+    
+  public void sendFile(String fileName) throws Exception
+  { 
+    send("put "+fileName+"\n"); 
+    File myFile = new File(currentDir+"/"+fileName);
+    FileInputStream fis = null;
+    OutputStream os = null;
+    while (true) 
+    {
+        try {
+        byte[] mybytearray = new byte[1024];
+        fis = new FileInputStream(myFile);
+        os = clientSocket.getOutputStream();
+
+        int count;
+        while ((count = fis.read(mybytearray)) >= 0) {
+            os.write(mybytearray, 0, count);
+
+        }
+        System.out.println("Sending " + fileName + "(" + Integer.toString((int)myFile.length()) + " bytes)");
+        os.flush();
+        break;
+        } finally{
+          fis.close();
+        }
+
+    }
+  }
+
+
+  public static void main(String args[])throws Exception 
   {
-    int controlPort = 2121;
+    int serverPort = 2121;
     int dataPort = 2020;
-    Socket clientSocket;
-    TCP_Client client = new TCP_Client(controlPort,dataPort);
+    TCP_Client client = new TCP_Client(serverPort,dataPort);
     String fromServer;
     String msg,input;
     String params[];
@@ -111,21 +143,13 @@ class TCP_Client
     {
       input =  System.console().readLine("> ");
       params = input.split(" ");
-      // client.send(input+'\n',client.clientSocket);
-      // fromServer = client.receive(client.clientSocket);
-      // System.out.println("FROM SERVER: " + fromServer);
-      
+  
       if(params[0].equals("open"))
       { 
-        client.open(params[1],controlPort);
+        client.open(params[1],serverPort);
       }
       else if (params[0].equals("cd")) 
       {
-        if (params.length == 1) 
-        {
-          // client.help(0);
-          continue;
-        }
         client.cd(params[1]);
         continue;
       }
@@ -134,8 +158,13 @@ class TCP_Client
         client.ls();
         continue;
       } 
+      else if(params[0].equals("put"))
+      { 
+        client.sendFile(params[1]);
+          continue;
+      }
       else if(params[0].equals("quit"))
-      {
+      { 
         client.quit();
         break;
       }

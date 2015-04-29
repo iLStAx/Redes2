@@ -1,5 +1,6 @@
 import java.io.*;
 import java.net.*;
+import java.io.ByteArrayOutputStream;
 
 class TCP_Server{
 
@@ -12,13 +13,15 @@ class TCP_Server{
   int controlPort;
   int dataPort;
   String dir;
-
+  String dirAux;
+  int buffer_size;
 
   public TCP_Server () throws Exception 
   {
     serverSocket = new ServerSocket(2121);
     clientSocket = serverSocket.accept();
     dir = ".";
+    dirAux = System.getProperty("user.dir");
   }
 
 
@@ -41,13 +44,42 @@ class TCP_Server{
   }
   
   public void cd(String dir) throws Exception {
+    String dirAbs[] = dirAux.split("/");
+    String aux[] = new String[dirAbs.length-1];
+    String dirFinal = "";
+    if(dir.equals(".."))
+    {
+      for(int i =0;i < dirAbs.length-1;i++)
+      {
+        aux[i] = dirAbs[i];
+      }
+      for(int i =0;i < dirAbs.length-1;i++)
+      { 
+        if(i == dirAbs.length-2)
+        {
+          dirFinal += aux[i];
+          dirAux = dirFinal;
+        }
+        else
+        {
+          dirFinal += aux[i]+"/";
+          dirAux = dirFinal;
+        }
+      }
+    }
+    else
+    {
+      dirAux += "/"+dir;
+    }
+
     if (dir.startsWith("/")) 
     {
       File f = new File(dir);
       if (f.exists() && f.isDirectory()) 
       {
         this.dir = dir;
-        send("250\n");
+        send("250 "+dirAux+"\n");
+        // send("250 "+dirAbs2[dirAbs2.length-1]+"/"+this.dir+"\n");
         return;
       }
       send("550\n");
@@ -58,8 +90,9 @@ class TCP_Server{
         if (this.dir.equals(".")) {
           this.dir = "";
         }
-        this.dir = this.dir + dir;
-        send("250\n");
+        this.dir = this.dir  +dir +"/";
+        send("250 "+dirAux+"\n");
+        // send("250 "+dirAbs2[dirAbs2.length-1]+"/"+this.dir+"\n");
         return;
       }
       send("550\n");
@@ -67,28 +100,63 @@ class TCP_Server{
   }
 
   public void ls() throws Exception {
-    System.out.println("TCP ls");
     String list = " ";
     String final2 ="";
+    String dirAbs = System.getProperty("user.dir");
+    String dirAbs2[] = dirAbs.split("/");
+    String empty = "empty dirr\n";
     File dir = new File(this.dir);
-    for (String d : dir.list()) 
+    // System.out.println(dirAbs2[dirAbs2.length-1]);
+    send(dirAux+"\n");
+    if(dir.list().length > 0)
     {
-      File f = new File(this.dir+"/"+d);
-      if (f.isFile()) {
-        d = "file   " + d + "&&&";
+      for (String d : dir.list()) 
+      {
+        File f = new File(this.dir+"/"+d);
+        if (f.isFile()) {
+          d = "file   " + d + "saltodelinea";
+        }
+        else {
+          d = "dir    " + d +"saltodelinea";
+        } 
+        final2 =final2 + d;
       }
-      else {
-        d = "dir    " + d +"&&&";
-      } 
-      final2 =final2 + d;
+      send(final2+"\n");
     }
-
-    send(final2+"\n");
+    send(empty);
   }
 
+  private void saveFile(String fileName) throws Exception {  
+    
+    InputStream is = null;
+    FileOutputStream fos = null;
+    try {
+        byte[] mybytearray = new byte[1024];
+        is = clientSocket.getInputStream();
+        fos = new FileOutputStream("hola/"+fileName);
+
+        int count;
+        while ((count = is.read(mybytearray)) >= 0) {
+            fos.write(mybytearray, 0, count);
+        }
+    } finally {
+            fos.close();
+    }
+
+  
+  } 
+
+
+    
+
+  public Boolean isConnected() throws Exception
+  {
+      return clientSocket.isConnected();
+  }
   
   public void quit() throws Exception {
-    System.out.println("TCP Terminando sesión.");
+    System.out.println("TCP Connection Close.");
+    send("quit\n");
     clientSocket.close();
     serverSocket.close();
   }
@@ -115,59 +183,39 @@ class TCP_Server{
     String capitalizedSentence;
     String fromClient;
     String output[];
-    while(true)
+    while(server.clientSocket != null)
     { 
-      // BufferedReader inFromClient = new BufferedReader(new InputStreamReader(clientSocket.getInputStream()));
-      // DataOutputStream outToClient = new DataOutputStream(clientSocket.getOutputStream());
-      // fromClient = inFromClient.readLine();
       fromClient = server.receive();
       output = fromClient.split(" ");
-      // System.out.println("FROM CLIENT: " + fromClient);
 
       if(output[0].equals("open"))
       { 
-        System.out.println("> Cient : " + fromClient);
+        System.out.println("> Client : " + fromClient);
         server.open();
       }
       else if(output[0].equals("cd"))
       { 
-        System.out.println("> Cient : " + fromClient);
+        System.out.println("> Client : " + fromClient);
         server.cd(output[1]);
       }
       else if(output[0].equals("ls"))
       { 
-        System.out.println("> Cient : " + fromClient);
+        System.out.println("> Client : " + fromClient);
         server.ls();
+      }
+      else if(output[0].equals("put"))
+      { 
+        System.out.println("> Client : " + fromClient);
+        server.saveFile(output[1]);
+
       }
       else if(output[0].equals("quit"))
       { 
-        server.send("quit");
+        System.out.println("> Client : " + fromClient);
         server.quit();
         break;
       }
-      // System.out.println("Received: " + fromClient);
-      // server.send("Chupalo\n",clientSocket);
-      // capitalizedSentence = "Chupalo"+'\n';
-      // outToClient.writeBytes(capitalizedSentence);
-      // fromClient = server.receive(clientSocket);
-      // output = fromClient.split(" ");
-      // System.out.println("Received: " + fromClient);
-
-      // // fromClient = in.readLine ();
-      // if (output[0].equals("open")) 
-      // {
-      //   capitalizedSentence = "220"+'\n';
-      //   server.send("pene",clientSocket);
-      //   System.out.println(output[1]);        
-      // }
-      // else if (output[0].equals("ls")) {
-      //   capitalizedSentence = "ls 220"+'\n';
-      //   server.send(capitalizedSentence,clientSocket);
-      // }
-      // else if (output[0].equals("cd")) {
-      //   capitalizedSentence = "cd 220"+'\n';
-      //   server.send(capitalizedSentence,clientSocket);
-      // }
+      
     }
    
   }
